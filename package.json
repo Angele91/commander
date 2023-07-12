@@ -1,0 +1,78 @@
+{
+  "name": "commander",
+  "version": "0.0.1",
+  "description": "Command orquestation tool to make your life easier",
+  "author": "Angel Gonzalez @Angele91",
+  "bin": {
+    "commander": "./bin/run"
+  },
+  "homepage": "https://github.com/Angele91/commander",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "repository": "Angele91/commander",
+  "files": [
+    "/bin",
+    "/dist",
+    "/npm-shrinkwrap.json",
+    "/oclif.manifest.json"
+  ],
+  "dependencies": {
+    "@inquirer/core": "^2.3.0",
+    "@inquirer/prompts": "^2.3.0",
+    "@oclif/core": "^2",
+    "@oclif/plugin-help": "^5",
+    "@oclif/plugin-plugins": "^2.4.7",
+    "inquirer": "8",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@oclif/test": "^2.3.26",
+    "@types/chai": "^4",
+    "@types/inquirer": "8",
+    "@types/mocha": "^9.0.0",
+    "@types/mute-stream": "^0.0.1",
+    "@types/node": "^16.18.38",
+    "chai": "^4",
+    "eslint": "^7.32.0",
+    "eslint-config-oclif": "^4",
+    "eslint-config-oclif-typescript": "^1.0.3",
+    "mocha": "^9",
+    "oclif": "^3",
+    "shx": "^0.3.3",
+    "ts-node": "^10.9.1",
+    "tslib": "^2.6.0",
+    "typescript": "^4.9.5"
+  },
+  "oclif": {
+    "bin": "commander",
+    "dirname": "commander",
+    "commands": "./dist/commands",
+    "plugins": [
+      "@oclif/plugin-help",
+      "@oclif/plugin-plugins"
+    ],
+    "topicSeparator": " ",
+    "topics": {
+      "hello": {
+        "description": "Say hello to the world and others"
+      }
+    }
+  },
+  "scripts": {
+    "build": "shx rm -rf dist && tsc -b",
+    "lint": "eslint . --ext .ts --config .eslintrc",
+    "postpack": "shx rm -f oclif.manifest.json",
+    "posttest": "yarn lint",
+    "prepack": "yarn build && oclif manifest && oclif readme",
+    "test": "mocha --forbid-only \"test/**/*.test.ts\"",
+    "version": "oclif readme && git add README.md"
+  },
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "bugs": "https://github.com/Angele91/commander/issues",
+  "keywords": [
+    "oclif"
+  ],
+  "types": "dist/index.d.ts"
+}
