@@ -1,5 +1,5 @@
 {
-  "name": "commander",
+  "name": "@angeleduardo/commander",
   "version": "0.0.1",
   "description": "Command orquestation tool to make your life easier",
   "author": "Angel Gonzalez @Angele91",
@@ -9,7 +9,10 @@
   "homepage": "https://github.com/Angele91/commander",
   "license": "MIT",
   "main": "dist/index.js",
-  "repository": "Angele91/commander",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Angele91/commander.git"
+  },
   "files": [
     "/bin",
     "/dist",
@@ -70,9 +73,14 @@
   "engines": {
     "node": ">=12.0.0"
   },
-  "bugs": "https://github.com/Angele91/commander/issues",
+  "bugs": {
+    "url": "https://github.com/Angele91/commander/issues"
+  },
   "keywords": [
     "oclif"
   ],
-  "types": "dist/index.d.ts"
+  "types": "dist/index.d.ts",
+  "directories": {
+    "test": "test"
+  }
 }

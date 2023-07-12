@@ -17,6 +17,16 @@ npm link
 
 ```
 
+or, you can install it through yarn or NPM
+
+```
+yarn add @angeleduardo/commander
+
+// or
+
+npm install @angeleduardo/commander
+```
+
 ## How Commander works
 
 Commander works by allowing you to define and execute commands. A command is defined by a set of properties:
