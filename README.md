@@ -1,3 +1,5 @@
+# Commander CLI
+
 Commander is a CLI tool that allows you to create, list, remove, and execute command containers.
 
 ## Purpose
@@ -9,8 +11,8 @@ The purpose of this CLI is to make it easier for developers to manage their comm
 To use Commander, you need to clone the repository and link the package globally using npm:
 
 ```
-git clone <https://github.com/yourusername/commander-cli.git>
-cd commander-cli
+git clone https://github.com/Angele91/commander.git
+cd commander
 npm link
 
 ```
