@@ -4,7 +4,7 @@ Commander is a CLI tool that allows you to create, list, remove, and execute com
 
 ## Purpose
 
-The purpose of this CLI is to make it easier for developers to manage their commands. With Commander, you can group commands into containers, and execute them whenever you need to, saving time and effort.
+The purpose of this CLI is to make it easier for developers to manage their commands. With Commander, you can create commands, add steps to the commands, in order to automate processes usually done manually.
 
 ## Installation
 
