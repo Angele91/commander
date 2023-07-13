@@ -4,14 +4,14 @@
       {
           "type": "node",
           "request": "launch",
-          "name": "Execute Command",
+          "name": "Execute Remove Command",
           "skipFiles": [
               "<node_internals>/**"
           ],
           "program": "${workspaceFolder}/bin/dev",
           "args": [
-            "hello",
-            "world",
+            "execute",
+            "cmd2"
           ],
       }
   ]

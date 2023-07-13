@@ -61,6 +61,10 @@ This command lets you delete an already created command.
 
 This command lets you execute a command.
 
+### commander update [name]
+
+This command lets you update a command.
+
 ## Contributing
 
 Contributions are welcome! If you have any issues or feature requests, please open an issue on the [GitHub repository](https://github.com/yourusername/commander-cli).
