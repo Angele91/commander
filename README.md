@@ -1,6 +1,7 @@
 # Commander CLI
 
-Commander is a CLI tool that allows you to create, list, remove, and execute command containers.
+Commander is a CLI tool that allows you to create, list, remove, and execute commands, that consists in a group of steps.
+A step is basically a... _command_. But not like the one you manage through this CLI, but _literally_ a command. Like _cd_, _npm start_, or whatever.
 
 ## Purpose
 
@@ -29,7 +30,7 @@ npm install @angeleduardo/commander
 
 ## How Commander works
 
-Commander works by allowing you to define and execute commands. A command is defined by a set of properties:
+Commander works by allowing you to define and execute commands, and add steps to them. A step is defined by a set of properties:
 
 - **name**: The command that will be executed.
 - **dependencies**: Which other commands need to be executed before this one to be able to execute.
@@ -37,9 +38,7 @@ Commander works by allowing you to define and execute commands. A command is def
 - **runNpmInstall**: If an `npm install` or `yarn install` is needed before executing the command.
 - **checkOutBranch**: If a `git checkout` is needed before executing the command.
 
-Once you define your commands, you can group them into a command container, which is basically a set of related commands that can be executed together. A command container has a name and an array of commands.
-
-You can then use Commander to execute your command containers, either sequentially or in parallel, depending on your needs.
+You can then use Commander to execute commands, which will consist on a group of steps, executed either sequentially or in parallel, depending on your needs.
 
 ## Usage
 
@@ -67,7 +66,7 @@ This command lets you update a command.
 
 ## Contributing
 
-Contributions are welcome! If you have any issues or feature requests, please open an issue on the [GitHub repository](https://github.com/yourusername/commander-cli).
+Contributions are welcome! If you have any issues or feature requests, please open an issue on the [GitHub repository](https://github.com/Angele91/commander).
 
 ## License
 
