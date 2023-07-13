@@ -91,7 +91,7 @@ Me too!
 
 ### The above was not exactly a question...
 
-The above text wasn't either a question.
+The above text wasn't neither a question.
 
 
 ## Contributing
