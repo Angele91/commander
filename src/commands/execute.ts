@@ -2,20 +2,20 @@
 import {Args, Command, ux} from '@oclif/core'
 import {existsSync} from 'node:fs'
 import {isEmpty} from 'lodash'
-import {executeCommands, getBaseDir, getCommand, getCommands, handleMissingDependencies} from '../helper'
+import {executeSteps, getBaseDir, getCommand, getCommands, handleMissingDependencies} from '../helper'
 import {prompt} from 'inquirer'
 
 export default class Execute extends Command {
-  static description = 'describe the command here'
+  static description = 'it executes a command'
 
   static examples = [
-    '<%= config.bin %> <%= command.id %>',
+    '<%= config.bin %> <%= command.id %> [command]',
   ]
 
   static flags = {}
 
   static args = {
-    file: Args.string({description: 'file to read'}),
+    command: Args.string({description: 'command to execute'}),
   }
 
   public async run(): Promise<void> {
@@ -29,7 +29,7 @@ export default class Execute extends Command {
     }
 
     ux.action.start('Checking commands')
-    let choice = args.file
+    let choice = args.command
     ux.action.stop()
 
     if (!choice || isEmpty(choice) || !getCommand(choice!)) {
@@ -39,33 +39,29 @@ export default class Execute extends Command {
 
       const commands = getCommands()
 
-      while (!choice) {
-        choice = await prompt([{
-          type: 'list',
-          name: 'command',
-          message: 'Which command do you want to execute?',
-          choices: commands.map(cmd => cmd.name),
-        }]).then(answer => answer.command)
-      }
+      choice = await prompt([{
+        type: 'list',
+        name: 'command',
+        message: 'Which command do you want to execute?',
+        choices: commands.map(cmd => cmd.name),
+      }]).then(answer => answer.command)
     }
 
-    const command = getCommand(choice)
-    const executedCommands: string[] = []
+    const command = getCommand(choice!)
+    const executedSteps: string[] = []
 
-    let remainingCommands = [...command!.commands ?? []]
+    let remainingSteps = [...command!.steps ?? []]
 
-    while (remainingCommands.length > 0) {
-      const executed = await executeCommands(remainingCommands, executedCommands)
+    while (remainingSteps.length > 0) {
+      const executed = await executeSteps(remainingSteps, executedSteps)
       if (!executed) {
-        handleMissingDependencies(remainingCommands, executedCommands, this)
+        handleMissingDependencies(remainingSteps, executedSteps, this)
+        continue
       }
 
-      remainingCommands = remainingCommands.filter(
-        cmd => !executedCommands.includes(cmd.name),
+      remainingSteps = remainingSteps.filter(
+        cmd => !executedSteps.includes(cmd.name),
       )
-
-      this.debug('Remaining commands', remainingCommands.join(', '))
-      remainingCommands = remainingCommands.filter(cmd => !executedCommands.includes(cmd.name))
     }
   }
 }

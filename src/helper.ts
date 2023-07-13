@@ -1,18 +1,17 @@
-/* eslint-disable no-prototype-builtins */
-/* eslint-disable unicorn/prefer-module */
 /* eslint-disable no-negated-condition */
 /* eslint-disable no-await-in-loop */
 /* eslint-disable no-constant-condition */
 import {prompt} from 'inquirer'
 import * as fs from 'node:fs'
 import {join} from 'node:path'
-import {CommandType} from './types/command-type'
+import {CommandStep} from './types/command-step'
 import {execSync} from 'node:child_process'
-import {Command} from '@oclif/core'
+import {Command, ux} from '@oclif/core'
 import {homedir} from 'node:os'
 import path = require('node:path')
 import {BASE_FOLDER_NAME} from './constants'
-import {CommandContainerType} from './types/command-container-type'
+import {CommandType} from './types/command-type'
+import {cloneDeep} from 'lodash'
 
 /**
  * Finds and returns the path of a selected directory within the current directory and its subdirectories.
@@ -58,83 +57,78 @@ export async function findPath(): Promise<string> {
 }
 
 /**
- * Executes a command and returns the result.
+ * Executes a step in a command.
  *
- * @param {CommandType} command - The command to execute.
- * @param {string[]} executedCommands - The list of previously executed commands.
- * @return {void} - This function does not return any value.
+ * @param {CommandStep} step - The step to be executed.
+ * @param {string[]} executedSteps - The list of steps that have been executed.
+ * @return {Promise<void>} - A promise that resolves when the step has been executed.
  */
-export async function executeCommand(
-  command: CommandType,
-  executedCommands: string[],
+export async function executeStep(
+  step: CommandStep,
+  executedSteps: string[],
 ): Promise<void> {
-  if (command.checkOutBranch) {
+  if (step.checkOutBranch) {
     const branchName = await prompt([{
       type: 'input',
       name: 'branchName',
       message: 'Write the branch name',
       default: 'main',
     }]).then(answer => answer.branchName)
-    execSync('git fetch --all', {cwd: command.path, encoding: 'utf-8', stdio: 'inherit'})
-    execSync('git pull', {cwd: command.path, encoding: 'utf-8', stdio: 'inherit'})
-    execSync(`git checkout ${branchName}`, {cwd: command.path, encoding: 'utf-8', stdio: 'inherit'})
+    execSync('git fetch --all', {cwd: step.path, encoding: 'utf-8', stdio: 'inherit'})
+    execSync('git pull', {cwd: step.path, encoding: 'utf-8', stdio: 'inherit'})
+    execSync(`git checkout ${branchName}`, {cwd: step.path, encoding: 'utf-8', stdio: 'inherit'})
   }
 
-  if (command.runNpmInstall) {
+  if (step.runNpmInstall) {
     try {
-      // Run the command to check if yarn is installed
-      execSync('yarn --version', {cwd: command.path})
-      execSync('yarn install', {cwd: command.path, encoding: 'utf-8', stdio: 'inherit'})
+      // Run the step to check if yarn is installed
+      execSync('yarn --version', {cwd: step.path})
+      execSync('yarn install', {cwd: step.path, encoding: 'utf-8', stdio: 'inherit'})
     } catch {
-      execSync('npm install', {cwd: command.path, encoding: 'utf-8', stdio: 'inherit'})
+      execSync('npm install', {cwd: step.path, encoding: 'utf-8', stdio: 'inherit'})
     }
   }
 
-  execSync(command.name, {
-    cwd: command.path,
+  execSync(step.instruction, {
+    cwd: step.path,
     encoding: 'utf-8',
     stdio: 'inherit',
   })
 
-  executedCommands.push(command.name)
+  executedSteps.push(step.name)
 }
 
 /**
- * Executes a series of commands.
+ * Executes a series of steps.
  *
- * @param {any[]} remainingCommands - The array of remaining commands to execute.
- * @param {string[]} executedCommands - The array of already executed commands.
- * @param {Command} context - The context of the command.
- * @return {boolean} Returns true if any command was executed, false otherwise.
+ * @param {any[]} remainingSteps - An array of steps that are yet to be executed.
+ * @param {string[]} executedSteps - An array of steps that have already been executed.
+ * @return {Promise<boolean>} A promise that resolves to a boolean indicating whether the steps were successfully executed.
  */
-export async function executeCommands(
-  remainingCommands: any[],
-  executedCommands: string[],
+export async function executeSteps(
+  remainingSteps: any[],
+  executedSteps: string[],
 ): Promise<boolean> {
-  for (const command of remainingCommands) {
+  for (const step of remainingSteps) {
     if (
-      executedCommands.includes(command.name)
+      executedSteps.includes(step.name)
     ) {
       continue
     }
 
     if (
-      command.dependencies.length === 0 ||
-      dependenciesExecuted(command.dependencies, executedCommands)
+      step.dependencies.length === 0 ||
+      dependenciesExecuted(step.dependencies, executedSteps)
     ) {
-      if (command.concurrence) {
-        executeCommand(command, executedCommands)
-      } else if (
-        dependenciesExecuted(command.dependencies, executedCommands)
-      ) {
-        await executeCommand(command, executedCommands)
+      if (step.concurrence) {
+        executeStep(step, executedSteps)
       } else {
-        continue
+        await executeStep(step, executedSteps)
       }
-    }
 
-    executedCommands.push(command.name)
-    return true
+      executedSteps.push(step.name)
+      return true
+    }
   }
 
   return false
@@ -155,34 +149,34 @@ export function dependenciesExecuted(
 }
 
 /**
- * Handles missing dependencies by filtering the remaining commands based on whether their dependencies have been executed or not. It then logs an error message with the missing dependencies and the remaining commands.
+ * Handles missing dependencies for the given command.
  *
- * @param {any[]} remainingCommands - An array of remaining commands.
- * @param {string[]} executedCommands - An array of executed commands.
- * @param {any} context - The context object.
- * @return {void} This function does not return any value.
+ * @param {any[]} remainingSteps - The array of remaining steps.
+ * @param {string[]} executedSteps - The array of executed steps.
+ * @param {Command} context - The command context.
+ * @return {void} This function does not return a value.
  */
 export function handleMissingDependencies(
-  remainingCommands: any[],
-  executedCommands: string[],
+  remainingSteps: any[],
+  executedSteps: string[],
   context: Command,
 ): void {
-  const remainingCommandsNames = remainingCommands.map(
+  const remainingStepNames = remainingSteps.map(
     command => command.name,
   )
-  const missingDependencies = remainingCommands
+  const missingDependencies = remainingSteps
   .filter(
     cmd =>
       cmd.dependencies.some(
-        (dep: string) => !executedCommands.includes(dep),
+        (dep: string) => !executedSteps.includes(dep),
       ),
   )
   .map(cmd => cmd.name)
 
-  context.error(
-    `Missing dependencies for commands: ${missingDependencies.join(', ')}`,
+  context.log(
+    `Missing dependencies for commands: ${missingDependencies.map(step => step.name).join(', ')}`,
   )
-  context.error(`Remaining commands: ${remainingCommandsNames.join(', ')}`)
+  context.log(`Remaining commands: ${remainingStepNames.map(step => step.name).join(', ')}`)
 }
 
 /**
@@ -199,16 +193,18 @@ export function getBaseDir(): string {
 
 export function getCommands(
   baseDir?: string,
-): CommandContainerType[] {
+): CommandType[] {
   const commanderDir = baseDir ?? getBaseDir()
   const files = fs.readdirSync(commanderDir)
-  const commands: CommandContainerType[] = []
+  const commands: CommandType[] = []
 
   for (const file of files) {
     try {
-      const command = require(path.join(commanderDir, file))
+      const rawCommand = fs.readFileSync(path.join(commanderDir, file), {encoding: 'utf-8'})
+      const command = JSON.parse(rawCommand) as CommandType
       commands.push(command)
-    } catch {
+    } catch (error: any) {
+      console.error(error)
       continue
     }
   }
@@ -219,13 +215,14 @@ export function getCommands(
 export function getCommand(
   commandName: string,
   baseDir?: string,
-): CommandContainerType | null {
+): CommandType | null {
   const commanderDir = baseDir ?? getBaseDir()
   const files = fs.readdirSync(commanderDir)
 
   for (const file of files) {
     try {
-      const command = require(path.join(commanderDir, file))
+      const rawCommand = fs.readFileSync(path.join(commanderDir, file), {encoding: 'utf-8'})
+      const command = JSON.parse(rawCommand) as CommandType
       if (command.name === commandName) {
         return command
       }
@@ -238,68 +235,55 @@ export function getCommand(
 }
 
 /**
- * Sorts an array of commands by dependency and logs the details of each command.
+ * Sorts the given array of `CommandStep` objects based on the number of dependencies they have,
+ * and logs the steps and their details using the provided `Command` context.
  *
- * @param {CommandType[]} commands - An array of commands to be sorted and logged.
- * @param {Command} context - The context of the commands.
- * @return {void} This function does not return a value.
+ * @param {CommandStep[]} steps - The array of `CommandStep` objects to be sorted and logged.
+ * @param {Command} context - The `Command` context object used for logging the steps.
+ * @returns {void}
  */
-export function logCommands(commands: CommandType[], context: Command): void {
-  // Sort commands by dependency (number of dependencies)
-  commands.sort((a, b) => a.dependencies.length - b.dependencies.length)
+export function logSteps(steps: CommandStep[], context: Command): void {
+  steps.sort((a, b) => a.dependencies.length - b.dependencies.length)
 
-  // Create a map to store nested commands
-  const nestedCommands: { [key: string]: CommandType[] } = {}
+  const nestedSteps: { [key: string]: CommandStep[] } = {}
 
-  // Iterate through each command
-  let index = 1
-  for (const command of commands) {
-    // Check if the command has dependencies
-    if (command.dependencies.length > 0) {
-      // Get the first dependency of the command
-      const firstDependency = command.dependencies[0]
+  for (const step of steps) {
+    if (step.dependencies.length > 0) {
+      const firstDependency = step.dependencies[0]
 
-      // Check if the first dependency is already nested
-      if (nestedCommands.hasOwnProperty(firstDependency)) {
-        // Add the command to the nested commands
-        nestedCommands[firstDependency].push(command)
+      if (nestedSteps[firstDependency]) {
+        nestedSteps[firstDependency].push(step)
       } else {
-        // Create a new nested command array
-        nestedCommands[firstDependency] = [command]
+        nestedSteps[firstDependency] = [step]
       }
     } else {
-      // Log the command if it has no dependencies
-      context.log(`Command ${index}:`)
-      context.log(`Name: ${command.name}`)
-      context.log(`Dependencies: ${command.dependencies.join(', ')}`)
-      context.log(`Concurrence: ${command.concurrence}`)
-      context.log(`Path: ${command.path}`)
-      context.log(`Run Npm Install: ${command.runNpmInstall}`)
-      context.log(`Check Out Branch: ${command.checkOutBranch}`)
+      context.log(`Step: ${step.name}`)
+      context.log(`Dependencies: ${step.dependencies.join(', ')}`)
+      context.log(`Concurrence: ${step.concurrence}`)
+      context.log(`Path: ${step.path}`)
+      context.log(`Run Npm Install: ${step.runNpmInstall}`)
+      context.log(`Check Out Branch: ${step.checkOutBranch}`)
       context.log('---------------------')
-      index++
     }
   }
 
   // Log the nested commands recursively
-  logNestedCommands(nestedCommands, context)
+  logNestedSteps(nestedSteps, context)
 }
 
 /**
- * Logs the nested commands of a given object.
+ * Logs the nested steps of a command.
  *
- * @param {Object} nestedCommands - An object containing nested commands.
- * @param {Command} context - The current command context.
+ * @param {Object<string, CommandStep[]>} nestedSteps - The nested steps of the command.
+ * @param {Command} context - The command context.
  * @param {string} indent - The indentation string.
  * @return {void} This function does not return anything.
  */
-export function logNestedCommands(nestedCommands: { [key: string]: CommandType[] }, context: Command, indent = ''): void {
-  for (const dependency of Object.keys(nestedCommands)) {
-    const commands = nestedCommands[dependency]
+export function logNestedSteps(nestedSteps: { [key: string]: CommandStep[] }, context: Command, indent = ''): void {
+  for (const dependency of Object.keys(nestedSteps)) {
+    const commands = nestedSteps[dependency]
     console.log(`${indent}Dependency: ${dependency}`)
-    let commandIndex = 1
     for (const command of commands) {
-      console.log(`${indent}  Command ${commandIndex}:`)
       console.log(`${indent}  Name: ${command.name}`)
       console.log(`${indent}  Dependencies: ${command.dependencies.join(', ')}`)
       console.log(`${indent}  Concurrence: ${command.concurrence}`)
@@ -308,9 +292,288 @@ export function logNestedCommands(nestedCommands: { [key: string]: CommandType[]
       console.log(`${indent}  Check Out Branch: ${command.checkOutBranch}`)
       console.log(`${indent}  ---------------------`)
 
-      // Recursively log nested commands
-      logNestedCommands(nestedCommands, context, `${indent}  `)
-      commandIndex++
+      logNestedSteps(nestedSteps, context, `${indent}  `)
     }
   }
 }
+
+export async function createStep(
+  step?: CommandStep,
+  otherSteps?: CommandStep[],
+): Promise<CommandStep> {
+  let currentPath = process.cwd()
+
+  let dependencies = [] as string[]
+
+  const name = await prompt([{
+    type: 'input',
+    name: 'name',
+    message: 'Write the step name',
+    default: step?.name,
+    validate: (value: string) => {
+      if (value.length < 3) {
+        return 'Step name must be at least 3 characters long'
+      }
+
+      if (otherSteps?.some(cmd => cmd.name === value)) {
+        return 'That step already exists'
+      }
+
+      return true
+    },
+  }]).then(answer => answer.name)
+
+  const instruction = await prompt([{
+    type: 'input',
+    name: 'name',
+    message: 'Write the command to execute in this step',
+  }]).then(answer => answer.name)
+
+  if ((otherSteps?.length ?? 0) > 0) {
+    dependencies = await prompt([{
+      type: 'checkbox',
+      name: 'dependencies',
+      message: `[${name}] Select the steps that should be executed before this one`,
+      choices: otherSteps?.map(cmd => cmd.name),
+      default: step?.dependencies,
+    }]).then(answer => answer.dependencies)
+  }
+
+  const concurrence = await prompt([{
+    type: 'confirm',
+    name: 'concurrence',
+    message: `[${name}] Should this step be executed asynchronously?`,
+    default: step?.concurrence,
+  }]).then(answer => answer.concurrence)
+
+  const executeInCurrentPath = await prompt([{
+    type: 'confirm',
+    name: 'executeInCurrentPath',
+    message: `[${name}] Should this step be executed in the current path?`,
+    default: step === undefined ? true : step?.path === currentPath,
+  }]).then(answer => answer.executeInCurrentPath)
+
+  if (!executeInCurrentPath) {
+    currentPath = await findPath()
+  }
+
+  // Check if the directory has a .git directory
+  const hasGitDirectory = fs.existsSync(path.join(currentPath, '.git'))
+  let checkOutBranch = false
+
+  if (hasGitDirectory) {
+    checkOutBranch = await prompt([{
+      type: 'confirm',
+      name: 'checkOutBranch',
+      message: `[${name}] Should this step check out to a branch before execution?`,
+      default: step?.checkOutBranch,
+    }]).then(answer => answer.checkOutBranch)
+  }
+
+  // Check if the directory has a package.json file
+  const hasPackageJson = fs.existsSync(path.join(currentPath, 'package.json'))
+  let runNpmInstall = false
+
+  if (hasPackageJson) {
+    runNpmInstall = await prompt([{
+      type: 'confirm',
+      name: 'runNpmInstall',
+      message: `[${name}] Should this step run npm install before execution?`,
+      default: step?.runNpmInstall,
+    }]).then(answer => answer.runNpmInstall)
+  }
+
+  return {
+    name,
+    instruction,
+    dependencies,
+    concurrence,
+    path: currentPath,
+    runNpmInstall,
+    checkOutBranch,
+  }
+}
+
+export async function createCommand(): Promise<CommandType> {
+  const commands = getCommands()
+
+  const name = await prompt([{
+    type: 'input',
+    name: 'name',
+    message: 'Write the command name',
+    default: 'command',
+    validate: (value: string) => {
+      if (value.length < 3) {
+        return 'Command name must be at least 3 characters long'
+      }
+
+      if (commands.some(cmd => cmd.name === value)) {
+        return 'That command already exists'
+      }
+
+      return true
+    },
+  }]).then(answer => answer.name)
+
+  const command = {
+    name,
+    steps: [] as CommandStep[],
+  }
+
+  while (true) {
+    const step = await createStep(undefined, command.steps)
+
+    command.steps.push(step)
+
+    const addAnotherCommand = await prompt([{
+      type: 'confirm',
+      name: 'addAnotherCommand',
+      message: 'Do you want to add another step?',
+      default: false,
+    }]).then(answer => answer.addAnotherCommand)
+
+    if (!addAnotherCommand) {
+      break
+    }
+  }
+
+  return command
+}
+
+/**
+ * Prompts the user to update the name of the given command.
+ *
+ * @param {CommandType} command - The command to update.
+ * @return {Promise<string>} A promise that resolves to the updated name.
+ */
+async function updateCommandName(command: CommandType): Promise<string> {
+  const name = await prompt([
+    {
+      type: 'input',
+      name: 'name',
+      message: 'Write the command name',
+      default: command.name,
+      validate: (value: string) => {
+        if (value.length < 3) {
+          return 'Command name must be at least 3 characters long'
+        }
+
+        if (getCommands().some(cmd => cmd.name === value)) {
+          return 'That command already exists'
+        }
+
+        return true
+      },
+    },
+  ]).then(answer => answer.name)
+
+  return name
+}
+
+/**
+ * Asynchronously selects a step to update based on a given command.
+ *
+ * @param {CommandType} command - The command object containing the steps.
+ * @return {Promise<{ index: number, step: CommandStep; }>} A promise that resolves to the selected step.
+ */
+async function selectStepToUpdate(command: CommandType): Promise<{ index: number; step: CommandStep }> {
+  const stepToUpdate = await prompt([
+    {
+      type: 'list',
+      name: 'stepToUpdate',
+      message: 'Which step do you want to update?',
+      choices: [
+        ...command.steps.map(step => step.name),
+        {
+          name: 'Add new step',
+          value: '__ADD_NEW_STEP',
+        },
+      ],
+    },
+  ]).then(answer => answer.stepToUpdate)
+
+  if (stepToUpdate === '__ADD_NEW_STEP') {
+    const step = await createStep(undefined, command.steps)
+
+    return {index: -1, step}
+  }
+
+  const stepIndex = command.steps.findIndex(step => step.name === stepToUpdate)
+
+  return {index: stepIndex, step: command.steps[stepIndex]}
+}
+
+/**
+ * Prompts the user to update the given step.
+ *
+ * @param {CommandStep} step - The step to update.
+ * @param {CommandStep[]} otherSteps - The other steps in the command.
+ * @return {Promise<CommandStep>} A promise that resolves to the updated step.
+ */
+async function updateStep(step: CommandStep, otherSteps: CommandStep[]): Promise<CommandStep> {
+  const updatedStep = await createStep(step, otherSteps.filter(cmd => cmd.name !== step.name))
+
+  return updatedStep
+}
+
+/**
+ * Updates a command.
+ *
+ * @param {CommandType} originalCommand - The original command to update.
+ * @return {Promise<CommandType>} - The updated command.
+ */
+export async function updateCommand(originalCommand: CommandType): Promise<CommandType> {
+  const commanderDir = getBaseDir()
+  const command = cloneDeep(originalCommand)
+
+  while (true) {
+    const whatToUpdate = await prompt([
+      {
+        type: 'list',
+        name: 'whatToUpdate',
+        message: 'What do you want to update?',
+        choices: ['Name', 'Steps', 'Exit'],
+      },
+    ]).then(answer => answer.whatToUpdate)
+
+    if (whatToUpdate === 'Exit') {
+      break
+    }
+
+    if (whatToUpdate === 'Name') {
+      const name = await updateCommandName(command)
+      ux.action.start('Updating command name')
+      fs.renameSync(join(commanderDir, command.name), join(commanderDir, name))
+      command.name = name
+      ux.action.stop()
+    }
+
+    if (whatToUpdate === 'Steps') {
+      const {index, step} = await selectStepToUpdate(command)
+
+      if (!step) {
+        continue
+      }
+
+      if (index === -1) {
+        command.steps.push(step)
+
+        ux.action.start('Updating step')
+        fs.writeFileSync(join(commanderDir, command.name), JSON.stringify(command, null, 2))
+        ux.action.stop()
+        continue
+      }
+
+      const updatedStep = await updateStep(step, command.steps)
+
+      command.steps[index] = updatedStep
+
+      ux.action.start('Updating step')
+      fs.writeFileSync(join(commanderDir, command.name), JSON.stringify(command, null, 2))
+      ux.action.stop()
+    }
+  }
+
+  return command
+}
+

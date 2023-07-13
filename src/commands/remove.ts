@@ -1,13 +1,15 @@
 import {Args, Command, ux} from '@oclif/core'
-import {getBaseDir, getCommand} from '../helper'
+import {getBaseDir, getCommand, getCommands} from '../helper'
 import {rmSync} from 'node:fs'
+import {prompt} from 'inquirer'
 import path = require('path')
+import {isEmpty} from 'lodash'
 
 export default class Remove extends Command {
-  static description = 'describe the command here'
+  static description = 'it removes a command from the command list'
 
   static examples = [
-    '<%= config.bin %> <%= command.id %>',
+    '<%= config.bin %> <%= command.id %> [command]',
   ]
 
   static flags = {}
@@ -19,25 +21,32 @@ export default class Remove extends Command {
   public async run(): Promise<void> {
     const {args} = await this.parse(Remove)
 
-    const {name} = args
+    let {name} = args
 
-    if (!name) {
-      this.error('You must specify a command name')
-      return
+    const commands = getCommands()
+
+    if (!name || isEmpty(name)) {
+      this.log('You must specify a command name')
+      name = await prompt([{
+        type: 'list',
+        name: 'name',
+        message: 'Select a command to delete',
+        choices: commands.map(cmd => cmd.name),
+      }]).then(answer => answer.name)
     }
 
     this.log(`Removing ${name}`)
 
-    const command = getCommand(name)
+    const command = getCommand(name!)
 
     if (!command) {
       this.error('That command does not exist')
-      return
     }
 
     ux.action.start('Removing command')
 
-    rmSync(path.join(getBaseDir(), name), {recursive: true, force: true})
+    const dir = path.join(getBaseDir(), name!)
+    rmSync(dir, {recursive: true, force: true})
 
     ux.action.stop()
 

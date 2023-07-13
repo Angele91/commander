@@ -1,8 +1,8 @@
 import {Command} from '@oclif/core'
-import {getCommands, logCommands} from '../helper'
+import {getCommands} from '../helper'
 
 export default class List extends Command {
-  static description = 'describe the command here'
+  static description = 'it lists all the commands'
 
   static examples = [
     '<%= config.bin %> <%= command.id %>',
@@ -22,7 +22,9 @@ export default class List extends Command {
 
     for (const command of commands) {
       this.log(command.name)
-      logCommands(command.commands, this)
+      for (const step of command.steps) {
+        this.log(` ${step.name}`)
+      }
     }
   }
 }
