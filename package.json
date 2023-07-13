@@ -1,6 +1,6 @@
 {
   "name": "@angeleduardo/commander",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Command orquestation tool to make your life easier",
   "author": "Angel Gonzalez @Angele91",
   "bin": {
